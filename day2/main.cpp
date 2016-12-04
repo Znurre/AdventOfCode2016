@@ -1,0 +1,166 @@
+#include <iostream>
+#include <vector>
+#include <cmath>
+#include <numeric>
+#include <sstream>
+#include <iterator>
+#include <algorithm>
+
+struct Bounds
+{
+	int min;
+	int max;
+};
+
+int clamp(const Bounds &bounds, int value)
+{
+	return std::min(bounds.max, std::max(bounds.min, value));
+}
+
+struct IKeypad
+{
+	virtual int index() const = 0;
+	virtual int size() const = 0;
+
+	virtual std::string caption(int index) const = 0;
+
+	virtual Bounds vertical(int index) const = 0;
+	virtual Bounds horizontal(int index) const = 0;
+};
+
+struct Keypad1 : public IKeypad
+{
+	int index() const override
+	{
+		return 4;
+	}
+
+	int size() const override
+	{
+		return 3;
+	}
+
+	std::string caption(int index) const override
+	{
+		return std::to_string(index + 1);
+	}
+
+	Bounds vertical(int index) const override
+	{
+		const int start = index - ((index / 3) * 3);
+		const int end = start + 6;
+
+		return Bounds { start, end };
+	}
+
+	Bounds horizontal(int index) const override
+	{
+		const int start = (index / 3) * 3;
+		const int end = start + 3;
+
+		return Bounds { start, end };
+	}
+};
+
+struct Keypad2 : public IKeypad
+{
+	int index() const override
+	{
+		return 10;
+	}
+
+	int size() const override
+	{
+		return 5;
+	}
+
+	std::string caption(int index) const override
+	{
+		static std::vector<std::string> captions =
+		{
+			"-","-","1","-","-",
+			"-","2","3","4","-",
+			"5","6","7","8","9",
+			"-","A","B","C","-",
+			"-","-","D","-","-",
+		};
+
+		return captions[index];
+	}
+
+	Bounds vertical(int index) const override
+	{
+		static Bounds bounds[] =
+		{
+			{ 10, 10 },
+			{ 6, 16 },
+			{ 2, 22 },
+			{ 8, 18 },
+			{ 14, 14 }
+		};
+
+		return bounds[index - ((index / 5) * 5)];
+	}
+
+	Bounds horizontal(int index) const override
+	{
+		static Bounds bounds[] =
+		{
+			{ 2, 2 },
+			{ 7, 8 },
+			{ 10, 14 },
+			{ 16, 18 },
+			{ 22, 22 }
+		};
+
+		return bounds[index / 5];
+	}
+};
+
+void process(IKeypad &keypad, const std::vector<std::string> &instructions)
+{
+	std::accumulate(instructions.begin(), instructions.end(), keypad.index(), [&keypad](int index, const std::string &instruction)
+	{
+		const int result = std::accumulate(instruction.begin(), instruction.end(), index, [&keypad](int i, char c)
+		{
+			const Bounds &horizontal = keypad.horizontal(i);
+			const Bounds &vertical = keypad.vertical(i);
+
+			switch (c)
+			{
+				case 'U': return clamp(vertical, i - keypad.size());
+				case 'D': return clamp(vertical, i + keypad.size());
+				case 'L': return clamp(horizontal, i - 1);
+				case 'R': return clamp(horizontal, i + 1);
+			}
+
+			return 0;
+		});
+
+		std::cout << keypad.caption(result);
+
+		return result;
+	});
+
+	std::cout << std::endl;
+}
+
+int main()
+{
+	const std::vector<std::string> instructions =
+	{
+		"UDRLRRRUULUUDULRULUDRDRURLLDUUDURLUUUDRRRLUUDRUUDDDRRRLRURLLLDDDRDDRUDDULUULDDUDRUUUDLRLLRLDUDUUUUDLDULLLDRLRLRULDDDDDLULURUDURDDLLRDLUDRRULDURDDLUDLLRRUDRUDDDLLURULRDDDRDRRLLUUDDLLLLRLRUULRDRURRRLLLLDULDDLRRRRUDRDULLLDDRRRDLRLRRRLDRULDUDDLDLUULRDDULRDRURRURLDULRUUDUUURDRLDDDURLDURLDUDURRLLLLRDDLDRUURURRRRDRRDLUULLURRDLLLDLDUUUDRDRULULRULUUDDULDUURRLRLRRDULDULDRUUDLLUDLLLLUDDULDLLDLLURLLLRUDRDLRUDLULDLLLUDRLRLUDLDRDURDDULDURLLRRRDUUDLRDDRUUDLUURLDRRRRRLDDUUDRURUDLLLRRULLRLDRUURRRRRLRLLUDDRLUDRRDUDUUUDRUDULRRULRDRRRDDRLUUUDRLLURURRLLDUDRUURDLRURLLRDUDUUDLLLUULLRULRLDLRDDDU",
+		"DRRRDRUDRLDUUDLLLRLULLLUURLLRLDRLURDRDRDRLDUUULDRDDLDDDURURUDRUUURDRDURLRLUDRRRDURDRRRDULLRDRRLUUUURLRUULRRDUDDDDUURLDULUDLLLRULUDUURRDUULRRDDURLURRUDRDRLDLRLLULULURLRDLRRRUUURDDUUURDRDRUURUDLULDRDDULLLLLRLRLLUDDLULLUDDLRLRDLDULURDUDULRDDRLUDUUDUDRLLDRRLLDULLRLDURUDRLRRRDULUUUULRRLUDDDLDUUDULLUUURDRLLULRLDLLUUDLLUULUULUDLRRDDRLUUULDDRULDRLURUURDLURDDRULLLLDUDULUDURRDRLDDRRLRURLLRLLLLDURDLUULDLDDLULLLRDRRRDLLLUUDDDLDRRLUUUUUULDRULLLDUDLDLURLDUDULRRRULDLRRDRUUUUUURRDRUURLDDURDUURURULULLURLLLLUURDUDRRLRRLRLRRRRRULLDLLLRURRDULLDLLULLRDUULDUDUDULDURLRDLDRUUURLLDLLUUDURURUD",
+		"UDUUUUURUDLLLRRRDRDRUDDRLLDRRLDRLLUURRULUULULRLLRUDDRLDRLUURDUDLURUULLLULLRRRULRLURRDDULLULULRUDDDUURDRLUDUURRRRUUULLRULLLDLURUDLDDLLRRRULDLLUURDRRRDRDURURLRUDLDLURDDRLLLUUDRUULLDLLLLUUDRRURLDDUDULUDLDURDLURUURDUUUURDLLLRUUURDUUUDLDUDDLUDDUDUDUDLDUDUUULDULUURDDLRRRULLUDRRDLUDULDURUURULLLLUDDDLURURLRLRDLRULRLULURRLLRDUDUDRULLRULRUDLURUDLLDUDLRDRLRDURURRULLDDLRLDDRLRDRRDLRDDLLLLDUURRULLRLLDDLDLURLRLLDULRURRRRDULRLRURURRULULDUURRDLURRDDLDLLLRULRLLURLRLLDDLRUDDDULDLDLRLURRULRRLULUDLDUDUDDLLUURDDDLULURRULDRRDDDUUURLLDRDURUDRUDLLDRUD",
+		"ULRDULURRDDLULLDDLDDDRLDUURDLLDRRRDLLURDRUDDLDURUDRULRULRULULUULLLLDRLRLDRLLLLLRLRRLRLRRRDDULRRLUDLURLLRLLURDDRRDRUUUDLDLDRRRUDLRUDDRURRDUUUDUUULRLDDRDRDRULRLLDLDDLLRLUDLLLLUURLDLRUDRLRDRDRLRULRDDURRLRUDLRLRLDRUDURLRDLDULLUUULDRLRDDRDUDLLRUDDUDURRRRDLDURRUURDUULLDLRDUDDLUDDDRRRULRLULDRLDDRUURURLRRRURDURDRULLUUDURUDRDRLDLURDDDUDDURUDLRULULURRUULDRLDULRRRRDUULLRRRRLUDLRDDRLRUDLURRRDRDRLLLULLUULRDULRDLDUURRDULLRULRLRRURDDLDLLRUUDLRLDLRUUDLDDLLULDLUURRRLRDULRLRLDRLDUDURRRLLRUUDLUURRDLDDULDLULUUUUDRRULLLLLLUULDRULDLRUDDDRDRDDURUURLURRDLDDRUURULLULUUUDDLRDULDDLULDUDRU",
+		"LRLRLRLLLRRLUULDDUUUURDULLLRURLDLDRURRRUUDDDULURDRRDURLRLUDLLULDRULLRRRDUUDDRDRULLDDULLLUURDLRLRUURRRLRDLDUDLLRLLURLRLLLDDDULUDUDRDLRRLUDDLRDDURRDRDUUULLUURURLRRDUURLRDLLUDURLRDRLURUURDRLULLUUUURRDDULDDDRULURUULLUDDDDLRURDLLDRURDUDRRLRLDLRRDDRRDDRUDRDLUDDDLUDLUDLRUDDUDRUDLLRURDLRUULRUURULUURLRDULDLDLLRDRDUDDDULRLDDDRDUDDRRRLRRLLRRRUUURRLDLLDRRDLULUUURUDLULDULLLDLULRLRDLDDDDDDDLRDRDUDLDLRLUDRRDRRDRUURDUDLDDLUDDDDDDRUURURUURLURLDULUDDLDDLRUUUULRDRLUDLDDLLLRLLDRRULULRLRDURRRLDDRDDRLU"
+	};
+
+	Keypad1 keypad1;
+	Keypad2 keypad2;
+
+	process(keypad1, instructions);
+	process(keypad2, instructions);
+
+	return 0;
+}
